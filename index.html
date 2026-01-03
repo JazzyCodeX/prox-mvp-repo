@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROX - The Vibe Checker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #00D9FF;
+            --primary-hover: #00B8D4;
+            --secondary: #FF1744;
+            --bg-dark: #0F0F0F;
+            --bg-darker: #050505;
+            --text-light: #E8E8E8;
+            --text-muted: #888888;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--bg-darker) 0%, #1a0033 100%);
+            color: var(--text-light);
+        }
+
+        .glass-effect {
+            background: rgba(15, 15, 15, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+        }
+
+        .glow-text {
+            background: linear-gradient(90deg, #00D9FF, #B000FF, #FF1744);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 900;
+        }
+
+        .vibe-meter {
+            background: linear-gradient(90deg, #00D9FF 0%, #B000FF 50%, #FF1744 100%);
+            height: 3px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .vibe-fill {
+            height: 100%;
+            background: rgba(0, 217, 255, 0.9);
+            width: 0%;
+            transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .message-bubble {
+            animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(0, 217, 255, 0.6);
+            }
+        }
+
+        .thinking {
+            animation: pulse-glow 2s infinite;
+        }
+
+        .score-burst {
+            animation: scoreAppear 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes scoreAppear {
+            0% {
+                opacity: 0;
+                transform: scale(0.5) translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        input::placeholder {
+            color: var(--text-muted);
+        }
+
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 217, 255, 0.3);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(5, 5, 5, 0.9);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-dark);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #B000FF);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(0, 217, 255, 0.1);
+            color: var(--primary);
+            padding: 10px 20px;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 217, 255, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .modal-content {
+                padding: 24px;
+            }
+            
+            #chatContainer {
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="chatContainer" class="glass-effect w-full h-screen flex flex-col rounded-lg shadow-2xl">
+        <div class="border-b border-cyan-900/30 p-6 backdrop-blur">
+            <div class="flex items-start justify-between">
+                <div>
+                    <h1 class="text-3xl font-black glow-text">✨ PROX</h1>
+                    <p id="proxTitle" class="text-xs text-cyan-400 mt-2 font-mono">loading your vibe...</p>
+                </div>
+                <button id="configBtn" class="btn-secondary text-xs">⚙️ Setup</button>
+            </div>
+        </div>
+
+        <div id="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4" style="background: rgba(5,5,5,0.3);">
+            <div class="message-bubble text-center py-8">
+                <p class="text-cyan-400 text-sm font-mono">prox is ready to meet people.</p>
+                <p class="text-gray-600 text-xs mt-2">what would you say to impress them?</p>
+            </div>
+        </div>
+
+        <div class="border-t border-gray-800/50 p-6 backdrop-blur">
+            <div class="flex gap-3">
+                <input
+                    type="text"
+                    id="messageInput"
+                    placeholder="try to impress prox..."
+                    class="flex-1 bg-gray-900/50 border border-gray-700/50 rounded-lg px-4 py-3 text-white placeholder-gray-600 text-sm focus:border-cyan-500"
+                />
+                <button id="sendBtn" class="btn-primary">
+                    <span id="sendText">Send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="setupModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl font-black glow-text mb-6">Create Your Prox</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold mb-2 text-gray-300">Your Name</label>
+                    <input
+                        id="userName"
+                        type="text"
+                        placeholder="e.g. Jaswant"
+                        class="w-full bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:border-cyan-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold mb-2 text-gray-300">Prox Name</label>
+                    <input
+                        id="proxName"
+                        type="text"
+                        placeholder="e.g. Vibe Checker, CEO Defender"
+                        class="w-full bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:border-cyan-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold mb-2 text-gray-300">Your Personality (Paste chat logs or describe yourself)</label>
+                    <textarea
+                        id="personality"
+                        placeholder="e.g. I'm sarcastic, love AI, use 'fr fr', 'lowkey', 'bet', often roast my friends"
+                        class="w-full h-32 bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:border-cyan-500 resize-none"
+                    ></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold mb-2 text-gray-300">Strictness Level</label>
+                    <div class="flex gap-3">
+                        <button class="strictness-btn flex-1 py-2 px-4 rounded-lg text-xs font-bold border border-gray-700 hover:border-cyan-500 transition" data-level="chill">CHILL 😎</button>
+                        <button class="strictness-btn flex-1 py-2 px-4 rounded-lg text-xs font-bold border border-gray-700 hover:border-cyan-500 transition" data-level="normal">NORMAL 😤</button>
+                        <button class="strictness-btn flex-1 py-2 px-4 rounded-lg text-xs font-bold border border-cyan-500 bg-cyan-500/20" data-level="savage">SAVAGE 🔥</button>
+                    </div>
+                </div>
+
+                <button id="startBtn" class="btn-primary w-full mt-6">Start Gatekeeping</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let config = {
+            userName: "Prox User",
+            proxName: "Vibe Checker",
+            personality: "I'm cool, sarcastic, and selective about who I talk to.",
+            strictness: "normal"
+        };
+
+        let conversationHistory = [];
+        let isLoading = false;
+
+        const roastLibrary = {
+            chill: [
+                "lowkey interesting, but not sure yet... 3.2/10",
+                "you're giving energy... just not the right kind. 4.1/10",
+                "okay, i see something. not nothing. 5.5/10",
+                "alright, that's kinda cool actually. 6.8/10",
+                "you know what? not bad. 7.4/10",
+                "you passed. barely. 8.1/10",
+                "actually impressed. 8.9/10"
+            ],
+            normal: [
+                "that's literally the least creative thing i've heard all day. 2.1/10",
+                "you sound like a bot asking for discord. try again. 3.3/10",
+                "mid. completely mid. 4.7/10",
+                "okay, you have some taste. 6.2/10",
+                "not bad. you might actually vibe. 7.5/10",
+                "okay NOW we're talking. 8.3/10",
+                "you actually impressed me. 9.2/10"
+            ],
+            savage: [
+                "bro what was that 💀 1.2/10",
+                "nah this ain't it. not even close. 2.8/10",
+                "you tried. props for the effort. 4.4/10",
+                "you're growing on me. like a fungus. 6.1/10",
+                "okay i respect the energy now. 7.7/10",
+                "you actually have rizz. who knew. 8.6/10",
+                "you're one of the real ones fr fr. 9.5/10"
+            ]
+        };
+
+        function generateResponse(userMessage) {
+            let vibeScore = 5 + Math.random() * 3;
+            
+            const goodKeywords = ["code", "ai", "startup", "learning", "build", "create", "curious"];
+            const badKeywords = ["buy", "money", "snap", "add", "follow", "link"];
+            
+            goodKeywords.forEach(kw => {
+                if (userMessage.toLowerCase().includes(kw)) vibeScore += 1.5;
+            });
+            
+            badKeywords.forEach(kw => {
+                if (userMessage.toLowerCase().includes(kw)) vibeScore -= 2;
+            });
+            
+            vibeScore = Math.min(9.9, Math.max(1, vibeScore));
+
+            const roasts = roastLibrary[config.strictness];
+            const roastIndex = Math.floor((vibeScore / 10) * (roasts.length - 1));
+            const selectedRoast = roasts[roastIndex];
+
+            return {
+                roast: selectedRoast,
+                score: vibeScore.toFixed(1)
+            };
+        }
+
+        const messagesContainer = document.getElementById("messagesContainer");
+        const messageInput = document.getElementById("messageInput");
+        const sendBtn = document.getElementById("sendBtn");
+        const setupModal = document.getElementById("setupModal");
+        const configBtn = document.getElementById("configBtn");
+        const startBtn = document.getElementById("startBtn");
+        const proxTitle = document.getElementById("proxTitle");
+        const userNameInput = document.getElementById("userName");
+        const proxNameInput = document.getElementById("proxName");
+        const personalityInput = document.getElementById("personality");
+        const strictnessBtns = document.querySelectorAll(".strictness-btn");
+
+        strictnessBtns.forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                strictnessBtns.forEach(b => b.classList.remove("bg-cyan-500/20", "border-cyan-500"));
+                e.target.classList.add("bg-cyan-500/20", "border-cyan-500");
+                config.strictness = btn.dataset.level;
+            });
+        });
+
+        startBtn.addEventListener("click", () => {
+            config.userName = userNameInput.value || "Prox User";
+            config.proxName = proxNameInput.value || "Vibe Checker";
+            config.personality = personalityInput.value || config.personality;
+            
+            proxTitle.textContent = `the ${config.proxName.toLowerCase()}`;
+            setupModal.classList.remove("active");
+            messageInput.focus();
+        });
+
+        configBtn.addEventListener("click", () => {
+            setupModal.classList.add("active");
+        });
+
+        function addMessage(role, content, score = null) {
+            const bubble = document.createElement("div");
+            bubble.classList.add("message-bubble");
+            
+            if (role === "user") {
+                bubble.innerHTML = `
+                    <div class="flex justify-end">
+                        <div class="max-w-xs bg-gradient-to-r from-cyan-600 to-purple-600 rounded-lg rounded-br-none px-4 py-3">
+                            <p class="text-white text-sm break-words">${content}</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                bubble.innerHTML = `
+                    <div class="flex justify-start">
+                        <div class="max-w-xs bg-gray-800/60 border border-gray-700 rounded-lg rounded-bl-none px-4 py-3">
+                            <p class="text-gray-100 text-sm break-words">${content}</p>
+                            ${score ? `<p class="text-xs text-cyan-400 mt-2 font-mono">vibes: <span class="font-bold">${score}</span>/10</p>` : ""}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            messagesContainer.appendChild(bubble);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            if (isLoading || !messageInput.value.trim()) return;
+            
+            const userMessage = messageInput.value.trim();
+            messageInput.value = "";
+            isLoading = true;
+            
+            addMessage("user", userMessage);
+            
+            const thinkingDiv = document.createElement("div");
+            thinkingDiv.classList.add("message-bubble");
+            thinkingDiv.innerHTML = `
+                <div class="flex justify-start">
+                    <div class="bg-gray-800/60 border border-gray-700/50 rounded-lg rounded-bl-none px-4 py-3 thinking">
+                        <p class="text-gray-400 text-sm italic">prox is thinking...</p>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(thinkingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
+            
+            const response = generateResponse(userMessage);
+            
+            thinkingDiv.remove();
+            
+            addMessage("prox", response.roast, response.score);
+            
+            if (parseFloat(response.score) >= 7.5) {
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                const unlockDiv = document.createElement("div");
+                unlockDiv.classList.add("message-bubble", "score-burst");
+                unlockDiv.innerHTML = `
+                    <div class="flex justify-center py-4">
+                        <div class="text-center">
+                            <p class="text-2xl font-black glow-text mb-2">✅ YOU PASSED</p>
+                            <p class="text-xs text-gray-400 font-mono">contact info unlocked</p>
+                            <div class="mt-4 p-3 bg-gray-900/50 border border-cyan-500/30 rounded-lg">
+                                <p class="text-cyan-400 font-mono text-sm">jaswant.snap</p>
+                                <button class="text-xs text-cyan-400 hover:text-cyan-300 mt-2 font-bold" onclick="navigator.clipboard.writeText('jaswant.snap')">copy</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                messagesContainer.appendChild(unlockDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            isLoading = false;
+            messageInput.focus();
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        messageInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        window.addEventListener("load", () => {
+            setupModal.classList.add("active");
+        });
+    </script>
+</body>
+</html>
